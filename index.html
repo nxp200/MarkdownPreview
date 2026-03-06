@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Markdown to PDF/Word (Client Only)</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --muted: #94a3b8;
+      --text: #e5e7eb;
+      --accent: #4f46e5;
+      --border: #1f2937;
+      --success: #10b981;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      background: linear-gradient(180deg, #0b1022 0%, #0f172a 100%);
+      color: var(--text);
+    }
+
+    .app {
+      max-width: 1200px;
+      margin: 24px auto;
+      padding: 0 16px 24px;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 18px;
+      color: var(--muted);
+      letter-spacing: 0.3px;
+    }
+    .badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #0b1022;
+      border: 1px solid var(--border);
+      color: var(--muted);
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .btn {
+      background: linear-gradient(180deg, #121a33 0%, #0f162d 100%);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 14px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: transform 0.05s ease, border-color 0.2s ease, background 0.2s ease;
+      user-select: none;
+    }
+    .btn:hover { border-color: #273244; }
+    .btn:active { transform: translateY(1px); }
+    .btn.primary {
+      background: linear-gradient(180deg, #2a2f73 0%, #262b6a 100%);
+      border-color: #31388a;
+    }
+    .btn.success {
+      background: linear-gradient(180deg, #0f3b2f 0%, #0d3328 100%);
+      border-color: #145a49;
+      color: #c7ffee;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .panel {
+      background: linear-gradient(180deg, #0c1227 0%, #0b1120 100%);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      min-height: 60vh;
+    }
+    .panel-header {
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      background: rgba(17, 24, 39, 0.4);
+    }
+    .panel-title { color: var(--muted); font-size: 13px; }
+
+    .input-wrap { position: relative; flex: 1; display: flex; min-height: 0; }
+    textarea#md-input {
+      flex: 1;
+      background: transparent;
+      color: var(--text);
+      border: none;
+      outline: none;
+      padding: 14px;
+      resize: none;
+      font-size: 14px;
+      line-height: 1.5;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      white-space: pre;
+    }
+
+    .dropzone {
+      position: absolute;
+      inset: 0;
+      border: 1.5px dashed #243049;
+      border-radius: 12px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.15s ease;
+    }
+    .dropzone.active { opacity: 1; background: rgba(59, 130, 246, 0.06); }
+
+    .preview {
+      flex: 1;
+      overflow: auto;
+      padding: 16px 18px;
+      color: #e6edf3;
+    }
+
+    /* Minimal GitHub-like markdown styling */
+    .preview content {
+      max-width: 820px;
+      margin: 0 auto;
+      display: block;
+    }
+    .preview h1, .preview h2, .preview h3, .preview h4, .preview h5, .preview h6 {
+      color: #f8fafc;
+      margin-top: 1.2em;
+      margin-bottom: 0.5em;
+      line-height: 1.25;
+    }
+    .preview p { color: #e5e7eb; line-height: 1.7; }
+    .preview a { color: #93c5fd; }
+    .preview code { background: #0b132b; padding: 2px 6px; border-radius: 6px; }
+    .preview pre {
+      background: #0b132b;
+      border: 1px solid #1f2a44;
+      padding: 12px;
+      border-radius: 10px;
+      overflow: auto;
+    }
+    .preview blockquote {
+      border-left: 3px solid #334155;
+      margin: 0;
+      padding-left: 12px;
+      color: #cbd5e1;
+    }
+    .preview table {
+      border-collapse: collapse;
+      width: 100%;
+      border: 1px solid #22304a;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .preview th, .preview td {
+      border: 1px solid #22304a;
+      padding: 8px 10px;
+    }
+    .preview img { max-width: 100%; border-radius: 8px; }
+    .preview hr { border: none; border-top: 1px solid #22304a; margin: 24px 0; }
+
+    .footer {
+      margin-top: 16px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    /* Print styles to improve PDF pagination */
+    @media print {
+      /* Avoid breaking inside key block elements */
+      h1, h2, h3, h4, h5, h6,
+      p, ul, ol, li,
+      pre, blockquote, table, thead, tbody, tr, td, th,
+      img, code, figure {
+        page-break-inside: avoid;
+        break-inside: avoid;
+      }
+      /* Ensure tables and code blocks stay intact as much as possible */
+      table, pre { page-break-inside: avoid; }
+      /* Optional: start major headings on a new page if needed by adding .page-break */
+      .page-break { page-break-before: always; break-before: page; }
+    }
+    /* Visual hint for page-break markers in preview (subtle line) */
+    .preview .page-break {
+      border-top: 1px dashed #334155;
+      margin: 16px 0;
+      opacity: 0.6;
+    }
+
+    @media (max-width: 900px) {
+      .grid { grid-template-columns: 1fr; }
+      .panel { min-height: 46vh; }
+    }
+  </style>
+  <!-- Markdown parser -->
+  <script src="https://cdn.jsdelivr.net/npm/markdown-it@13.0.1/dist/markdown-it.min.js"></script>
+  <!-- Sanitizer for safety -->
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
+  <!-- html2pdf for PDF export (bundles html2canvas + jsPDF) -->
+  <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
+</head>
+<body>
+  <div class="app">
+    <div class="header">
+      <div class="title">
+        <span style="font-weight:600;color:#cbd5e1">Markdown Exporter</span>
+        <span class="badge">Client-only • No backend</span>
+      </div>
+      <div class="toolbar">
+        <label class="btn" for="file-input">📄 Import .md
+          <input id="file-input" type="file" accept=".md,.markdown,.txt" hidden />
+        </label>
+        <button id="btn-sample" class="btn">✨ Load sample</button>
+        <button id="btn-clear" class="btn">🧹 Clear</button>
+        <button id="btn-pdf" class="btn primary">⬇️ Download PDF</button>
+        <button id="btn-doc" class="btn success">⬇️ Download Word</button>
+      </div>
+    </div>
+
+    <div class="grid">
+      <section class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Markdown Input</div>
+          <div style="color:var(--muted); font-size:12px;">Type, paste, or drop a .md file</div>
+        </div>
+        <div class="input-wrap" id="input-wrap">
+          <textarea id="md-input" placeholder="# Hello World\n\nType your Markdown here or import a file..."></textarea>
+          <div class="dropzone" id="dropzone"></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Preview</div>
+          <div class="panel-title" style="opacity:.7">Rendered Markdown</div>
+        </div>
+        <div id="preview" class="preview">
+          <content id="preview-content"></content>
+        </div>
+      </section>
+    </div>
+
+    <div class="footer">
+      <small style="color:var(--muted)">Tip: Your content never leaves your browser.</small>
+    </div>
+  </div>
+
+  <script>
+    // Initialize markdown-it with some sensible defaults
+    const md = window.markdownit({
+      html: true,
+      linkify: true,
+      breaks: false,
+      typographer: true
+    });
+
+    const input = document.getElementById('md-input');
+    const previewContent = document.getElementById('preview-content');
+    const fileInput = document.getElementById('file-input');
+    const dropzone = document.getElementById('dropzone');
+    const inputWrap = document.getElementById('input-wrap');
+
+    const btnSample = document.getElementById('btn-sample');
+    const btnClear = document.getElementById('btn-clear');
+    const btnPDF = document.getElementById('btn-pdf');
+    const btnDOC = document.getElementById('btn-doc');
+
+    function render() {
+      try {
+        let raw = input.value || '';
+        // Support manual page breaks via a simple token
+        // Any line that is exactly ---pagebreak--- becomes a page break element
+        raw = raw.replace(/^---pagebreak---\s*$/gmi, '<div class="page-break"></div>');
+        const rendered = md.render(raw);
+        // Sanitize the HTML for safety
+        const safe = DOMPurify.sanitize(rendered, { USE_PROFILES: { html: true } });
+        previewContent.innerHTML = safe;
+      } catch (e) {
+        console.error('Render error', e);
+      }
+    }
+
+    // Debounce input
+    let t;
+    input.addEventListener('input', () => {
+      clearTimeout(t);
+      t = setTimeout(render, 80);
+    });
+
+    // File import
+    fileInput.addEventListener('change', async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const text = await file.text();
+      input.value = text;
+      render();
+      fileInput.value = '';
+    });
+
+    // Drag-and-drop support
+    ;['dragenter','dragover'].forEach(evt => {
+      inputWrap.addEventListener(evt, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropzone.classList.add('active');
+      });
+    });
+    ;['dragleave','drop'].forEach(evt => {
+      inputWrap.addEventListener(evt, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropzone.classList.remove('active');
+      });
+    });
+    inputWrap.addEventListener('drop', async (e) => {
+      const file = e.dataTransfer?.files?.[0];
+      if (!file) return;
+      if (!/\.(md|markdown|txt)$/i.test(file.name)) {
+        alert('Please drop a .md, .markdown, or .txt file');
+        return;
+      }
+      const text = await file.text();
+      input.value = text;
+      render();
+    });
+
+    // Sample content
+    const sample = `# Markdown Exporter\n\n- Supports live preview\n- Import .md files\n- Export to PDF and Word (client-side)\n\n## Features\n\n- **Code block:**\n\n\`\`\`js\nfunction greet(name) {\n  return \`Hello, ${name}!\`;\n}\nconsole.log(greet('World'));\n\n\`\`\`\n\n- Table:\n\n| Feature | Status |\n| --- | --- |\n| Preview | ✅ |\n| PDF | ✅ |\n| Word | ✅ |\n\n> Your content never leaves your browser.\n\n![Sample image](https://picsum.photos/800/300)\n`;
+
+    btnSample.addEventListener('click', () => {
+      input.value = sample;
+      render();
+    });
+
+    btnClear.addEventListener('click', () => {
+      input.value = '';
+      render();
+    });
+
+    // PDF export using html2pdf
+    btnPDF.addEventListener('click', () => {
+      const element = document.getElementById('preview');
+      // Clone content into a print-ready container to avoid UI chrome
+      const printable = document.createElement('div');
+      printable.style.padding = '20px';
+      printable.style.color = '#000';
+      printable.style.background = '#fff';
+      // Ensure the node is laid out (html2canvas cannot render display:none)
+      // Keep it visible but positioned far off-screen so it doesn't flash
+      printable.style.pointerEvents = 'none';
+      printable.style.position = 'fixed';
+      printable.style.top = '0';
+      printable.style.left = '-10000px';
+      printable.style.width = '800px';
+      printable.style.margin = '0 auto';
+      // Create a light theme version for PDF (black text on white)
+      const html = `
+        <div style="font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; color:#111; line-height:1.5; max-width:800px;">
+          ${previewContent.innerHTML}
+        </div>
+      `;
+      printable.innerHTML = html;
+      // Attach to DOM so CSS applies correctly for html2canvas
+      document.body.appendChild(printable);
+
+      const opt = {
+        margin:       10,
+        filename:     'markdown.pdf',
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        // Rely on CSS page-break rules; keep config simple to avoid rendering issues
+        pagebreak:    { mode: ['css'] }
+      };
+      // Wait a frame so layout is guaranteed before rendering to canvas
+      requestAnimationFrame(() => {
+        window.html2pdf().set(opt).from(printable).save().then(() => {
+          printable.remove();
+        }).catch(() => {
+          // Even if it fails, try to clean up
+          printable.remove();
+        });
+      });
+    });
+
+    // Word export (.doc) via HTML blob (simple & robust)
+    function exportToWord(filename = 'markdown.doc') {
+      const content = `
+        <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+        <head>
+          <meta charset="utf-8">
+          <title>Export</title>
+          <style>
+            body { font-family: Arial, Helvetica, sans-serif; color:#111; }
+            pre, code { font-family: Consolas, "Courier New", monospace; }
+            pre { background:#f3f4f6; padding:10px; border-radius:6px; }
+            table { border-collapse: collapse; width: 100%; }
+            th, td { border:1px solid #d1d5db; padding:6px 8px; }
+            img { max-width: 100%; height: auto; }
+            blockquote { border-left: 3px solid #d1d5db; padding-left: 10px; color:#374151; }
+          </style>
+        </head>
+        <body>
+          ${previewContent.innerHTML}
+        </body>
+        </html>`;
+      const blob = new Blob(['\ufeff', content], { type: 'application/msword' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      setTimeout(() => {
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }, 0);
+    }
+
+    btnDOC.addEventListener('click', () => exportToWord());
+
+    // Initial render
+    render();
+  </script>
+</body>
+</html>
